@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>COVID Test Scheduler</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>HealthScheduler</h1>
+                    <p>COVID Testing & Vaccination Center</p>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <i class="fas fa-heart-pulse"></i>
+                <span>System Online</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Service Selection Cards -->
+        <div class="service-cards">
+            <div class="service-card" id="covid-test-card" onclick="selectService('covid-test')">
+                <div class="card-header">
+                    <div class="card-icon blue">
+                        <i class="fas fa-virus"></i>
+                    </div>
+                    <h3>COVID-19 Testing</h3>
+                    <p>Rapid antigen and PCR tests available. Results within 24 hours.</p>
+                </div>
+                <div class="card-content">
+                    <div class="stat-row">
+                        <span>Available Slots Today:</span>
+                        <span class="stat-value green">24 slots</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Average Wait Time:</span>
+                        <span class="stat-value">15 minutes</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Next Available:</span>
+                        <span class="stat-value blue">2:30 PM</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="service-card" id="vaccination-card" onclick="selectService('vaccination')">
+                <div class="card-header">
+                    <div class="card-icon green">
+                        <i class="fas fa-syringe"></i>
+                    </div>
+                    <h3>COVID-19 Vaccination</h3>
+                    <p>Primary doses, boosters, and updated vaccines available.</p>
+                </div>
+                <div class="card-content">
+                    <div class="stat-row">
+                        <span>Available Slots Today:</span>
+                        <span class="stat-value green">18 slots</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Average Wait Time:</span>
+                        <span class="stat-value">20 minutes</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>Next Available:</span>
+                        <span class="stat-value green">3:15 PM</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tabs">
+            <div class="tab-list">
+                <button class="tab-button active" onclick="switchTab('book')">
+                    <i class="fas fa-calendar"></i>
+                    <span>Book Appointment</span>
+                </button>
+                <button class="tab-button" onclick="switchTab('queue')">
+                    <i class="fas fa-users"></i>
+                    <span>Live Queue</span>
+                </button>
+                <button class="tab-button" onclick="switchTab('dashboard')">
+                    <i class="fas fa-check-circle"></i>
+                    <span>My Appointments</span>
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- Book Appointment Tab -->
+                <div id="book-tab" class="tab-panel active">
+                    <div class="booking-container">
+                        <div id="date-selection" class="booking-step active">
+                            <div class="step-header">
+                                <h2><i class="fas fa-calendar"></i> Select Date & Time</h2>
+                                <p>Choose your preferred appointment slot</p>
+                            </div>
+
+                            <div class="date-selection">
+                                <h3>Select Date</h3>
+                                <div class="date-grid" id="date-grid">
+                                    <!-- Dates will be populated by JavaScript -->
+                                </div>
+                            </div>
+
+                            <div class="time-selection" id="time-selection" style="display: none;">
+                                <h3>Available Time Slots</h3>
+                                <div class="time-grid" id="time-grid">
+                                    <!-- Times will be populated by JavaScript -->
+                                </div>
+                            </div>
+
+                            <div class="step-actions">
+                                <button id="continue-btn" class="btn primary" onclick="nextStep()" style="display: none;">
+                                    Continue to Patient Information
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="patient-info" class="booking-step">
+                            <div class="step-header">
+                                <h2><i class="fas fa-user"></i> Patient Information</h2>
+                                <p id="appointment-summary">Appointment details will appear here</p>
+                            </div>
+
+                            <form id="patient-form" class="patient-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="patient-name">Full Name *</label>
+                                        <input type="text" id="patient-name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="patient-age">Age *</label>
+                                        <input type="number" id="patient-age" required>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="patient-email">Email Address *</label>
+                                    <input type="email" id="patient-email" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="patient-phone">Phone Number *</label>
+                                    <input type="tel" id="patient-phone" required>
+                                </div>
+
+                                <div class="form-group" id="priority-group" style="display: none;">
+                                    <label>Test Priority</label>
+                                    <div class="radio-group">
+                                        <label class="radio-option">
+                                            <input type="radio" name="priority" value="normal" checked>
+                                            <span>Normal (Standard processing)</span>
+                                        </label>
+                                        <label class="radio-option">
+                                            <input type="radio" name="priority" value="urgent">
+                                            <span>Urgent (Faster results - additional fee)</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="step-actions">
+                                    <button type="button" class="btn secondary" onclick="previousStep()">
+                                        Back to Date Selection
+                                    </button>
+                                    <button type="submit" class="btn success">
+                                        Confirm Appointment
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Queue Tab -->
+                <div id="queue-tab" class="tab-panel">
+                    <div class="queue-stats">
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-info">
+                                    <p>Total Served Today</p>
+                                    <h3 id="total-served">0</h3>
+                                </div>
+                                <i class="fas fa-trending-up"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-info">
+                                    <p>Avg Wait Time</p>
+                                    <h3 id="avg-wait">15 min</h3>
+                                </div>
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-info">
+                                    <p>Current Wait</p>
+                                    <h3 id="current-wait">12 min</h3>
+                                </div>
+                                <i class="fas fa-heart-pulse"></i>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-content">
+                                <div class="stat-info">
+                                    <p>Last Updated</p>
+                                    <h3 id="last-updated">--:--</h3>
+                                </div>
+                                <button onclick="updateQueue()" class="refresh-btn">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="queue-display">
+                        <div class="queue-section">
+                            <div class="queue-header">
+                                <h3><i class="fas fa-virus"></i> COVID-19 Testing Queue</h3>
+                                <span class="queue-count" id="testing-count">0 in queue</span>
+                            </div>
+                            <div id="testing-queue" class="queue-content">
+                                <!-- Queue items will be populated by JavaScript -->
+                            </div>
+                        </div>
+
+                        <div class="queue-section">
+                            <div class="queue-header">
+                                <h3><i class="fas fa-syringe"></i> Vaccination Queue</h3>
+                                <span class="queue-count" id="vaccination-count">0 in queue</span>
+                            </div>
+                            <div id="vaccination-queue" class="queue-content">
+                                <!-- Queue items will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Appointments Tab -->
+                <div id="dashboard-tab" class="tab-panel">
+                    <div class="dashboard-header">
+                        <h2><i class="fas fa-calendar-check"></i> My Appointments</h2>
+                        <p>View and manage your scheduled appointments</p>
+                    </div>
+                    <div id="appointments-list" class="appointments-list">
+                        <div class="no-appointments">
+                            <i class="fas fa-calendar-times"></i>
+                            <h3>No Appointments Yet</h3>
+                            <p>Book your first appointment to get started</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <div class="toast-content">
+            <i class="toast-icon"></i>
+            <div class="toast-text">
+                <h4 class="toast-title"></h4>
+                <p class="toast-message"></p>
+            </div>
+            <button class="toast-close" onclick="hideToast()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="data-structures.js"></script>
+    <script src="queue-manager.js"></script>
+    <script src="slot-manager.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
