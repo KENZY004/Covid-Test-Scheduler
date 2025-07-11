@@ -1,12 +1,17 @@
-
-// Priority Queue (Min-Heap) Implementation
+// Priority Queue Implementation
 class PriorityQueue {
     constructor() {
         this.heap = [];
+        this.priorityLevels = {
+            'high': 1,
+            'medium': 2,
+            'low': 3
+        };
     }
 
     enqueue(item, priority) {
-        this.heap.push({ item, priority });
+        const priorityValue = this.priorityLevels[priority] || 3;
+        this.heap.push({ item, priority: priorityValue });
         this.heapifyUp();
     }
 
@@ -51,9 +56,17 @@ class PriorityQueue {
     size() {
         return this.heap.length;
     }
+
+    isEmpty() {
+        return this.heap.length === 0;
+    }
+
+    peek() {
+        return this.heap[0];
+    }
 }
 
-// Hash Map for efficient slot management
+// Slot HashMap remains the same
 class SlotHashMap {
     constructor() {
         this.buckets = new Array(16);

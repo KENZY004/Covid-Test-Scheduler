@@ -1,69 +1,100 @@
-
 // Global Application State
 let selectedService = 'covid-test';
 let selectedDate = '';
 let selectedTime = '';
-let appointments = [];
 let currentStep = 1;
+let appointments = [];
+let queueState = {
+    testing: [],
+    vaccination: [],
+    currentlyServing: { testing: null, vaccination: null }
+};
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
+    // Clear any corrupted queue data
+    if (localStorage.getItem('queueState')) {
+        try {
+            const savedState = JSON.parse(localStorage.getItem('queueState'));
+            // Validate queue data structure
+            if (savedState.testing && savedState.vaccination && savedState.currentlyServing) {
+                queueState = savedState;
+            }
+        } catch (e) {
+            console.error("Clearing invalid queue data:", e);
+            localStorage.removeItem('queueState');
+        }
+    }
+
+    // Load appointments
+    appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    
     initializeApp();
     startQueueUpdates();
 });
 
 function initializeApp() {
     generateDateOptions();
-    updateQueue();
-    selectService('covid-test'); // Default selection
+    
+    // Reset queue manager
+    queueManager.testingQueue = new PriorityQueue();
+    queueManager.vaccinationQueue = new PriorityQueue();
+    queueManager.currentlyServing = { testing: null, vaccination: null };
+    
+    // Rebuild queues from valid appointments only
+    appointments.forEach(appointment => {
+        if (!appointment.status || appointment.status !== 'cancelled') {
+            const queueType = appointment.type.includes('Test') ? 'testing' : 'vaccination';
+            queueManager.addToQueue(queueType, appointment);
+        }
+    });
+    
+    saveQueueState();
+    updateQueueDisplay();
+    selectService('covid-test');
 }
+
+// function initializeApp() {
+//     generateDateOptions();
+    
+//     // Restore queue state from localStorage
+//     queueState.testing.forEach(patient => queueManager.testingQueue.enqueue(patient, patient.riskLevel));
+//     queueState.vaccination.forEach(patient => queueManager.vaccinationQueue.enqueue(patient, patient.riskLevel));
+//     queueManager.currentlyServing = queueState.currentlyServing;
+    
+//     updateQueueDisplay();
+//     selectService('covid-test');
+// }
 
 // Service Selection
 function selectService(service) {
     selectedService = service;
-    
-    // Update UI to show selected service
     document.querySelectorAll('.service-card').forEach(card => {
         card.classList.remove('selected');
     });
     document.getElementById(service + '-card').classList.add('selected');
-    
-    // Show/hide priority options for testing
-    const priorityGroup = document.getElementById('priority-group');
-    if (service === 'covid-test') {
-        priorityGroup.style.display = 'block';
-    } else {
-        priorityGroup.style.display = 'none';
-    }
 }
 
 // Tab Management
 function switchTab(tabName) {
-    // Update tab buttons
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.classList.remove('active');
     });
     event.target.closest('.tab-button').classList.add('active');
     
-    // Update tab panels
     document.querySelectorAll('.tab-panel').forEach(panel => {
         panel.classList.remove('active');
     });
     document.getElementById(tabName + '-tab').classList.add('active');
     
-    // Load tab-specific content
-    if (tabName === 'queue') {
-        renderQueue();
-    } else if (tabName === 'dashboard') {
-        renderAppointments();
-    }
+    if (tabName === 'queue') renderQueue();
+    else if (tabName === 'dashboard') renderAppointments();
 }
 
 // Date and Time Selection
 function generateDateOptions() {
     const dateGrid = document.getElementById('date-grid');
     const today = new Date();
-    
     dateGrid.innerHTML = '';
     
     for (let i = 0; i < 14; i++) {
@@ -82,29 +113,49 @@ function generateDateOptions() {
                 ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </div>
         `;
-        
         dateGrid.appendChild(dateOption);
     }
 }
 
 function selectDate(date) {
     selectedDate = date;
-    
-    // Update UI
     document.querySelectorAll('.date-option').forEach(option => {
         option.classList.remove('selected');
     });
     event.target.closest('.date-option').classList.add('selected');
-    
-    // Generate time slots
     generateTimeOptions();
     document.getElementById('time-selection').style.display = 'block';
 }
 
+// function generateTimeOptions() {
+//     const timeGrid = document.getElementById('time-grid');
+//     const availableSlots = slotManager.getAvailableSlots(selectedDate);
+//     timeGrid.innerHTML = '';
+    
+//     if (availableSlots.length === 0) {
+//         timeGrid.innerHTML = `
+//             <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #6b7280;">
+//                 <i class="fas fa-clock" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+//                 <p>No available slots for this date</p>
+//             </div>
+//         `;
+//         return;
+//     }
+    
+//     availableSlots.forEach(slot => {
+//         const timeOption = document.createElement('div');
+//         timeOption.className = 'time-option';
+//         timeOption.onclick = () => selectTime(slot.time);
+//         timeOption.innerHTML = `
+//             <div class="time">${slot.time}</div>
+//             <div class="slots">${slot.capacity - slot.booked} left</div>
+//         `;
+//         timeGrid.appendChild(timeOption);
+//     });
+// }
 function generateTimeOptions() {
     const timeGrid = document.getElementById('time-grid');
     const availableSlots = slotManager.getAvailableSlots(selectedDate);
-    
     timeGrid.innerHTML = '';
     
     if (availableSlots.length === 0) {
@@ -112,7 +163,6 @@ function generateTimeOptions() {
             <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #6b7280;">
                 <i class="fas fa-clock" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
                 <p>No available slots for this date</p>
-                <p style="font-size: 0.875rem;">Please select a different date</p>
             </div>
         `;
         return;
@@ -122,11 +172,16 @@ function generateTimeOptions() {
         const timeOption = document.createElement('div');
         timeOption.className = 'time-option';
         timeOption.onclick = () => selectTime(slot.time);
-        
         timeOption.innerHTML = `
             <div class="time">${slot.time}</div>
             <div class="slots">${slot.capacity - slot.booked} left</div>
         `;
+        
+        // Disable if no slots left
+        if (slot.capacity - slot.booked <= 0) {
+            timeOption.classList.add('disabled');
+            timeOption.onclick = null;
+        }
         
         timeGrid.appendChild(timeOption);
     });
@@ -134,14 +189,10 @@ function generateTimeOptions() {
 
 function selectTime(time) {
     selectedTime = time;
-    
-    // Update UI
     document.querySelectorAll('.time-option').forEach(option => {
         option.classList.remove('selected');
     });
     event.target.closest('.time-option').classList.add('selected');
-    
-    // Show continue button
     document.getElementById('continue-btn').style.display = 'block';
 }
 
@@ -151,7 +202,6 @@ function nextStep() {
         document.getElementById('date-selection').classList.remove('active');
         document.getElementById('patient-info').classList.add('active');
         
-        // Update appointment summary
         const selectedDateObj = new Date(selectedDate);
         const summary = `Appointment: ${selectedDateObj.toLocaleDateString()} at ${selectedTime}`;
         document.getElementById('appointment-summary').textContent = summary;
@@ -168,56 +218,87 @@ function previousStep() {
     }
 }
 
-// Form Submission
+// // Form Submission
+// document.getElementById('patient-form').addEventListener('submit', function(e) {
+//     e.preventDefault();
+    
+//     const patientInfo = {
+//         id: Date.now(),
+//         name: document.getElementById('patient-name').value,
+//         email: document.getElementById('patient-email').value,
+//         phone: document.getElementById('patient-phone').value,
+//         age: document.getElementById('patient-age').value,
+//         riskLevel: document.querySelector('input[name="risk-level"]:checked').value,
+//         type: selectedService === 'covid-test' ? 'COVID-19 Test' : 'COVID-19 Vaccination',
+//         time: selectedTime,
+//         date: selectedDate,
+//         bookedAt: new Date().toISOString(),
+//         status: 'scheduled'  // Explicit status
+//     };
+
+//     if (!patientInfo.name || !patientInfo.email || !patientInfo.phone || !patientInfo.riskLevel) {
+//         showToast('Missing Information', 'Please fill in all required fields.', 'error');
+//         return;
+//     }
+
+//     // Add to appointments
+//     appointments.push(patientInfo);
+//     localStorage.setItem('appointments', JSON.stringify(appointments));
+    
+//     // Add to queue
+//     const queueType = selectedService === 'covid-test' ? 'testing' : 'vaccination';
+//     queueManager.addToQueue(queueType, patientInfo);
+//     saveQueueState();
+
+//     showToast('Booked!', `Your ${patientInfo.type} is confirmed for ${patientInfo.time}`, 'success');
+//     resetBookingForm();
+//     updateQueueDisplay();
+//     switchTabProgrammatically('dashboard');
+// });
+// In app.js - update the form submit handler
 document.getElementById('patient-form').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const formData = new FormData(e.target);
     const patientInfo = {
-        name: formData.get('patient-name') || document.getElementById('patient-name').value,
-        email: formData.get('patient-email') || document.getElementById('patient-email').value,
-        phone: formData.get('patient-phone') || document.getElementById('patient-phone').value,
-        age: formData.get('patient-age') || document.getElementById('patient-age').value,
-        priority: document.querySelector('input[name="priority"]:checked')?.value || 'normal'
+        id: Date.now(),
+        name: document.getElementById('patient-name').value,
+        email: document.getElementById('patient-email').value,
+        phone: document.getElementById('patient-phone').value,
+        age: document.getElementById('patient-age').value,
+        riskLevel: document.querySelector('input[name="risk-level"]:checked').value,
+        type: selectedService === 'covid-test' ? 'COVID-19 Test' : 'COVID-19 Vaccination',
+        time: selectedTime,
+        date: selectedDate,
+        bookedAt: new Date().toISOString(),
+        status: 'scheduled'
     };
-    
-    // Validate required fields
-    if (!patientInfo.name || !patientInfo.email || !patientInfo.phone) {
+
+    if (!patientInfo.name || !patientInfo.email || !patientInfo.phone || !patientInfo.riskLevel) {
         showToast('Missing Information', 'Please fill in all required fields.', 'error');
         return;
     }
-    
-    // Book the appointment
+
+    // First try to book the slot
     const bookingResult = slotManager.bookSlot(selectedDate, selectedTime, patientInfo);
     
     if (bookingResult.success) {
-        const appointment = {
-            id: Date.now(),
-            type: selectedService === 'covid-test' ? 'COVID-19 Test' : 'COVID-19 Vaccination',
-            date: selectedDate,
-            time: selectedTime,
-            patient: patientInfo,
-            status: 'confirmed'
-        };
+        // Add to appointments
+        appointments.push(patientInfo);
+        localStorage.setItem('appointments', JSON.stringify(appointments));
         
-        appointments.push(appointment);
-        
-        showToast(
-            'Appointment Booked Successfully!',
-            `Your ${appointment.type} appointment is confirmed for ${new Date(selectedDate).toLocaleDateString()} at ${selectedTime}`,
-            'success'
-        );
-        
-        // Reset form and switch to dashboard
+        // Add to queue
+        const queueType = selectedService === 'covid-test' ? 'testing' : 'vaccination';
+        queueManager.addToQueue(queueType, patientInfo);
+        saveQueueState();
+
+        showToast('Booked!', `Your ${patientInfo.type} is confirmed for ${patientInfo.time}`, 'success');
         resetBookingForm();
+        updateQueueDisplay();
         switchTabProgrammatically('dashboard');
-        
     } else if (bookingResult.waitlisted) {
-        showToast(
-            'Added to Waiting List',
-            `You're #${bookingResult.position} on the waiting list. We'll notify you if a slot opens up.`,
-            'info'
-        );
+        showToast('Waitlisted', `All slots are booked. You're #${bookingResult.position} on the waitlist.`, 'info');
+    } else {
+        showToast('Error', 'Could not book the selected time slot.', 'error');
     }
 });
 
@@ -228,7 +309,6 @@ function resetBookingForm() {
     document.getElementById('time-selection').style.display = 'none';
     document.getElementById('continue-btn').style.display = 'none';
     
-    // Clear selections
     document.querySelectorAll('.date-option').forEach(option => {
         option.classList.remove('selected');
     });
@@ -242,34 +322,107 @@ function resetBookingForm() {
 }
 
 function switchTabProgrammatically(tabName) {
-    // Update tab buttons
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.classList.remove('active');
     });
     
-    // Find and activate the correct button
     const buttons = document.querySelectorAll('.tab-button');
     if (tabName === 'book') buttons[0].classList.add('active');
     if (tabName === 'queue') buttons[1].classList.add('active');
     if (tabName === 'dashboard') buttons[2].classList.add('active');
     
-    // Update tab panels
     document.querySelectorAll('.tab-panel').forEach(panel => {
         panel.classList.remove('active');
     });
     document.getElementById(tabName + '-tab').classList.add('active');
     
-    // Load content
     if (tabName === 'dashboard') {
         renderAppointments();
     }
 }
 
 // Queue Management
+function saveQueueState() {
+    queueState = {
+        testing: queueManager.getQueue('testing'),
+        vaccination: queueManager.getQueue('vaccination'),
+        currentlyServing: queueManager.currentlyServing
+    };
+    localStorage.setItem('queueState', JSON.stringify(queueState));
+}
+
+function renderQueueSection(type, containerId, countId) {
+    const container = document.getElementById(containerId);
+    const countElement = document.getElementById(countId);
+    const queue = queueManager.getQueue(type);
+    const currentPatient = queueManager.getCurrentlyServing(type);
+
+    container.innerHTML = '';
+    countElement.textContent = `${queue.length} in queue`;
+
+    if (currentPatient) {
+        const currentDiv = document.createElement('div');
+        currentDiv.className = 'queue-item current';
+        currentDiv.innerHTML = `
+            <div class="queue-item-left">
+                <div class="queue-position ${type === 'testing' ? 'blue' : 'green'}">
+                    <i class="fas fa-user-md"></i>
+                </div>
+                <div class="queue-item-info">
+                    <h4>${currentPatient.name}</h4>
+                    <p>${currentPatient.type}</p>
+                    <div class="risk-badge ${currentPatient.riskLevel}">
+                        ${currentPatient.riskLevel} risk
+                    </div>
+                </div>
+            </div>
+            <div class="queue-item-right">
+                <div class="time">${currentPatient.time}</div>
+                <div class="priority">Priority: ${currentPatient.riskLevel}</div>
+            </div>
+        `;
+        container.appendChild(currentDiv);
+    }
+
+    if (queue.length === 0) {
+        container.innerHTML = `
+            <div class="no-queue">
+                <i class="fas fa-users"></i>
+                <h3>No one in queue</h3>
+            </div>
+        `;
+    } else {
+        queue.forEach((patient, index) => {
+            const queueDiv = document.createElement('div');
+            queueDiv.className = `queue-item ${patient.riskLevel === 'high' ? 'high-priority' : ''}`;
+            queueDiv.innerHTML = `
+                <div class="queue-item-left">
+                    <div class="queue-position ${type === 'testing' ? 'blue' : 'green'}">
+                        ${index + 1}
+                    </div>
+                    <div class="queue-item-info">
+                        <h4>${patient.name}</h4>
+                        <p>${patient.type}</p>
+                        <div class="risk-badge ${patient.riskLevel}">
+                            ${patient.riskLevel} risk
+                        </div>
+                    </div>
+                </div>
+                <div class="queue-item-right">
+                    <div class="time">${patient.time}</div>
+                    <div class="wait">~${queueManager.getEstimatedWaitTime(index + 1, patient.riskLevel)} min wait</div>
+                    <div class="priority">Priority: ${patient.riskLevel}</div>
+                </div>
+            `;
+            container.appendChild(queueDiv);
+        });
+    }
+}
+
+
 function updateQueue() {
     queueManager.updateQueue();
-    renderQueue();
-    updateQueueStats();
+    saveQueueState();
 }
 
 function renderQueue() {
@@ -282,97 +435,104 @@ function renderQueueSection(type, containerId, countId) {
     const countElement = document.getElementById(countId);
     const queue = queueManager.getQueue(type);
     const currentPatient = queueManager.getCurrentlyServing(type);
-    
+
     container.innerHTML = '';
     countElement.textContent = `${queue.length} in queue`;
-    
-    // Show currently being served
+
     if (currentPatient) {
         const currentDiv = document.createElement('div');
         currentDiv.className = 'queue-item current';
         currentDiv.innerHTML = `
             <div class="queue-item-left">
                 <div class="queue-position ${type === 'testing' ? 'blue' : 'green'}">
-                    <i class="fas fa-user-clock"></i>
+                    <i class="fas fa-user-md"></i>
                 </div>
                 <div class="queue-item-info">
                     <h4>${currentPatient.name}</h4>
-                    <p>${currentPatient.type} - In Progress</p>
+                    <p>${currentPatient.type}</p>
+                    <div class="risk-badge ${currentPatient.riskLevel}">
+                        ${currentPatient.riskLevel} risk
+                    </div>
                 </div>
             </div>
             <div class="queue-item-right">
-                <div class="time">Started: ${currentPatient.startTime}</div>
+                <div class="time">${currentPatient.time}</div>
+                <div class="priority">Priority: ${currentPatient.riskLevel}</div>
             </div>
         `;
         container.appendChild(currentDiv);
     }
-    
-    // Show queue
+
     if (queue.length === 0) {
-        const noQueueDiv = document.createElement('div');
-        noQueueDiv.className = 'no-queue';
-        noQueueDiv.innerHTML = `
-            <i class="fas fa-users"></i>
-            <h3>No one in queue</h3>
-            <p>Queue is empty</p>
+        container.innerHTML = `
+            <div class="no-queue">
+                <i class="fas fa-users"></i>
+                <h3>No one in queue</h3>
+            </div>
         `;
-        container.appendChild(noQueueDiv);
     } else {
-        queue.forEach(patient => {
+        queue.forEach((patient, index) => {
             const queueDiv = document.createElement('div');
-            queueDiv.className = 'queue-item';
+            queueDiv.className = `queue-item ${patient.riskLevel === 'high' ? 'high-priority' : ''}`;
             queueDiv.innerHTML = `
                 <div class="queue-item-left">
-                    <div class="queue-position ${type === 'testing' ? '' : 'green'}">
-                        ${patient.position}
+                    <div class="queue-position ${type === 'testing' ? 'blue' : 'green'}">
+                        ${index + 1}
                     </div>
                     <div class="queue-item-info">
                         <h4>${patient.name}</h4>
                         <p>${patient.type}</p>
-                        ${patient.priority === 'urgent' ? '<div class="urgent-badge">Urgent</div>' : ''}
+                        <div class="risk-badge ${patient.riskLevel}">
+                            ${patient.riskLevel} risk
+                        </div>
                     </div>
                 </div>
                 <div class="queue-item-right">
                     <div class="time">${patient.time}</div>
-                    <div class="wait">~${queueManager.getEstimatedWaitTime(patient.position)} min wait</div>
+                    <div class="wait">~${queueManager.getEstimatedWaitTime(index + 1, patient.riskLevel)} min wait</div>
+                    <div class="priority">Priority: ${patient.riskLevel}</div>
                 </div>
             `;
             container.appendChild(queueDiv);
         });
     }
 }
-
 function updateQueueStats() {
     const stats = queueManager.getStats();
     document.getElementById('total-served').textContent = stats.totalServed;
     document.getElementById('avg-wait').textContent = Math.round(stats.averageWaitTime) + ' min';
     document.getElementById('current-wait').textContent = Math.round(stats.currentWaitTime) + ' min';
-    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+    document.getElementById('last-updated').textContent = stats.lastUpdated;
 }
 
-// Appointments Dashboard
 function renderAppointments() {
     const container = document.getElementById('appointments-list');
     
-    if (appointments.length === 0) {
+    // Filter out cancelled appointments
+    const activeAppointments = appointments.filter(app => app.status !== 'cancelled');
+    
+    if (activeAppointments.length === 0) {
         container.innerHTML = `
             <div class="no-appointments">
                 <i class="fas fa-calendar-times"></i>
-                <h3>No Appointments Yet</h3>
-                <p>Book your first appointment to get started</p>
+                <h3>No Active Appointments</h3>
+                <p>You have no upcoming appointments</p>
             </div>
         `;
         return;
     }
     
     container.innerHTML = '';
-    appointments.forEach(appointment => {
+    activeAppointments.forEach(appointment => {
         const appointmentDiv = document.createElement('div');
         appointmentDiv.className = 'appointment-card';
+        appointmentDiv.setAttribute('data-id', appointment.id);
         appointmentDiv.innerHTML = `
             <div class="appointment-header">
                 <h3>${appointment.type}</h3>
-                <div class="appointment-status confirmed">Confirmed</div>
+                <div class="appointment-status ${appointment.status || 'scheduled'}">
+                    ${appointment.status || 'scheduled'}
+                </div>
             </div>
             <div class="appointment-details">
                 <div>
@@ -382,17 +542,45 @@ function renderAppointments() {
                     <strong>Time:</strong> ${appointment.time}
                 </div>
                 <div>
-                    <strong>Patient:</strong> ${appointment.patient.name}
+                    <strong>Patient:</strong> ${appointment.name}
                 </div>
                 <div>
-                    <strong>Contact:</strong> ${appointment.patient.email}
+                    <strong>Risk Level:</strong> <span class="risk-badge ${appointment.riskLevel}">
+                        ${appointment.riskLevel}
+                    </span>
+                </div>
+                <div>
+                    <strong>Contact:</strong> ${appointment.email}
                 </div>
             </div>
+            <button class="btn danger" onclick="cancelAppointment(${appointment.id})">
+                <i class="fas fa-times"></i> Cancel
+            </button>
         `;
         container.appendChild(appointmentDiv);
     });
 }
+// Update the cancelAppointment function to properly handle cancellation
 
+function cancelAppointment(appointmentId) {
+    // Find the appointment to get its type
+    const appointment = appointments.find(app => app.id === appointmentId);
+    if (!appointment) return;
+
+    // Remove from appointments
+    appointments = appointments.filter(app => app.id !== appointmentId);
+    localStorage.setItem('appointments', JSON.stringify(appointments));
+    
+    // Remove from the correct queue
+    const queueType = appointment.type.includes('Test') ? 'testing' : 'vaccination';
+    queueManager.removeFromQueue(queueType, appointmentId);
+    
+    saveQueueState();
+    updateQueueDisplay();
+    renderAppointments();
+    
+    showToast('Cancelled', 'Appointment has been cancelled', 'info');
+}
 // Toast Notifications
 function showToast(title, message, type = 'success') {
     const toast = document.getElementById('toast');
@@ -403,7 +591,6 @@ function showToast(title, message, type = 'success') {
     titleElement.textContent = title;
     messageElement.textContent = message;
     
-    // Set icon based on type
     toast.className = 'toast show';
     if (type === 'error') {
         toast.classList.add('error');
@@ -414,7 +601,6 @@ function showToast(title, message, type = 'success') {
         iconElement.className = 'toast-icon fas fa-check-circle';
     }
     
-    // Auto hide after 5 seconds
     setTimeout(hideToast, 5000);
 }
 
@@ -425,9 +611,8 @@ function hideToast() {
 // Real-time Updates
 function startQueueUpdates() {
     setInterval(() => {
-        updateQueue();
-        console.log('Queue updated at:', new Date().toLocaleTimeString());
-    }, 8000); // Update every 8 seconds
+        updateQueueDisplay();
+    }, 8000);
 }
 
 // Utility Functions

@@ -1,9 +1,22 @@
-
-// Queue Management System using Data Structures
+// queue-manager.js
 class QueueManager {
-    constructor() {
-        this.testingQueue = [];
-        this.vaccinationQueue = [];
+    // constructor() {
+    //     this.testingQueue = new PriorityQueue();
+    //     this.vaccinationQueue = new PriorityQueue();
+    //     this.currentlyServing = {
+    //         testing: null,
+    //         vaccination: null
+    //     };
+    //     this.stats = {
+    //         totalServed: 0,
+    //         averageWaitTime: 15,
+    //         currentWaitTime: 12,
+    //         lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    //     };
+    // }
+     constructor() {
+        this.testingQueue = new PriorityQueue();
+        this.vaccinationQueue = new PriorityQueue();
         this.currentlyServing = {
             testing: null,
             vaccination: null
@@ -11,34 +24,38 @@ class QueueManager {
         this.stats = {
             totalServed: 0,
             averageWaitTime: 15,
-            currentWaitTime: 12
+            currentWaitTime: 12,
+            lastUpdated: new Date().toLocaleTimeString()
         };
-        this.initializeQueue();
-    }
-
-    initializeQueue() {
-        // Initialize with sample data for demonstration
-        const testPatients = [
-            { id: 1, name: 'John D.', time: '14:30', type: 'PCR Test', priority: 'normal', position: 1 },
-            { id: 2, name: 'Sarah M.', time: '14:45', type: 'Rapid Test', priority: 'urgent', position: 2 },
-            { id: 3, name: 'Mike R.', time: '15:00', type: 'PCR Test', priority: 'normal', position: 3 },
-            { id: 4, name: 'Emily K.', time: '15:15', type: 'Rapid Test', priority: 'normal', position: 4 },
-        ];
-
-        const vaccinePatients = [
-            { id: 5, name: 'David L.', time: '14:20', type: 'Booster Shot', priority: 'normal', position: 1 },
-            { id: 6, name: 'Lisa H.', time: '14:40', type: 'First Dose', priority: 'normal', position: 2 },
-            { id: 7, name: 'Tom B.', time: '15:20', type: 'Second Dose', priority: 'normal', position: 3 },
-        ];
-
-        this.testingQueue = testPatients;
-        this.vaccinationQueue = vaccinePatients;
-        this.currentlyServing.testing = { id: 0, name: 'Anna C.', type: 'PCR Test', startTime: '14:15' };
-        this.currentlyServing.vaccination = { id: 0, name: 'Robert S.', type: 'Booster Shot', startTime: '14:10' };
+        
+        // Clear any existing queue data from localStorage
+        localStorage.removeItem('queueState');
     }
 
     getQueue(type) {
-        return type === 'testing' ? this.testingQueue : this.vaccinationQueue;
+        const queue = type === 'testing' ? this.testingQueue : this.vaccinationQueue;
+        
+        // Create a sorted array from the heap
+        const sortedHeap = [...queue.heap].sort((a, b) => {
+            // First sort by priority (high=1, medium=2, low=3)
+            if (a.priority !== b.priority) {
+                return a.priority - b.priority;
+            }
+            // Then by time of booking (earlier first)
+            return new Date(a.item.bookedAt) - new Date(b.item.bookedAt);
+        });
+
+        // Add position numbers based on priority
+        const sortedPatients = [];
+        sortedHeap.forEach((item, index) => {
+            const patient = {
+                ...item.item,
+                position: index + 1
+            };
+            sortedPatients.push(patient);
+        });
+
+        return sortedPatients;
     }
 
     getCurrentlyServing(type) {
@@ -46,56 +63,72 @@ class QueueManager {
     }
 
     addToQueue(type, patient) {
-        const queue = this.getQueue(type);
-        patient.position = queue.length + 1;
-        patient.id = Date.now();
-        queue.push(patient);
-        this.updatePositions(type);
+        const queue = type === 'testing' ? this.testingQueue : this.vaccinationQueue;
+        queue.enqueue(patient, patient.riskLevel);
+        this.updateStats();
+        return this.getQueue(type);
     }
 
     updateQueue() {
-        // Simulate queue progression
-        const random = Math.random();
-        
-        if (random < 0.3 && this.testingQueue.length > 0) {
-            // Move testing queue forward
-            this.currentlyServing.testing = this.testingQueue.shift();
-            this.updatePositions('testing');
-            this.stats.totalServed++;
-        }
-        
-        if (random < 0.2 && this.vaccinationQueue.length > 0) {
-            // Move vaccination queue forward
-            this.currentlyServing.vaccination = this.vaccinationQueue.shift();
-            this.updatePositions('vaccination');
+        const now = new Date();
+        this.stats.lastUpdated = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // Process testing queue
+        if (!this.testingQueue.isEmpty()) {
+            this.currentlyServing.testing = this.testingQueue.dequeue().item;
             this.stats.totalServed++;
         }
 
-        // Update wait times
-        this.stats.currentWaitTime = Math.max(5, this.stats.currentWaitTime + (Math.random() - 0.5) * 10);
-        this.stats.averageWaitTime = Math.max(10, this.stats.averageWaitTime + (Math.random() - 0.5) * 5);
+        // Process vaccination queue
+        if (!this.vaccinationQueue.isEmpty()) {
+            this.currentlyServing.vaccination = this.vaccinationQueue.dequeue().item;
+            this.stats.totalServed++;
+        }
+
+        this.updateStats();
     }
 
-    updatePositions(type) {
-        const queue = this.getQueue(type);
-        queue.forEach((patient, index) => {
-            patient.position = index + 1;
-        });
+    updateStats() {
+        const testingCount = this.testingQueue.size();
+        const vaccinationCount = this.vaccinationQueue.size();
+        
+        // Calculate priority factor (high priority patients reduce wait time)
+        const priorityFactor = this.getPriorityFactor();
+        
+        this.stats.currentWaitTime = Math.max(5, 
+            (testingCount + vaccinationCount) * 5 * priorityFactor + Math.floor(Math.random() * 10)
+        );
+        this.stats.averageWaitTime = Math.max(10, 
+            (testingCount + vaccinationCount) * 3 * priorityFactor + Math.floor(Math.random() * 7)
+        );
+    }
+
+    getPriorityFactor() {
+        const highPriorityInTesting = this.testingQueue.heap.some(item => item.priority === 1);
+        const highPriorityInVaccination = this.vaccinationQueue.heap.some(item => item.priority === 1);
+        return (highPriorityInTesting || highPriorityInVaccination) ? 0.7 : 1;
     }
 
     getStats() {
         return {
             ...this.stats,
-            testingQueueLength: this.testingQueue.length,
-            vaccinationQueueLength: this.vaccinationQueue.length
+            testingQueueLength: this.testingQueue.size(),
+            vaccinationQueueLength: this.vaccinationQueue.size(),
+            lastUpdated: this.stats.lastUpdated
         };
     }
 
-    getEstimatedWaitTime(position) {
-        const baseTime = 15; // minutes per person
+    getEstimatedWaitTime(position, riskLevel) {
+        const baseTime = riskLevel === 'high' ? 3 : 
+                         riskLevel === 'medium' ? 5 : 7;
         return position * baseTime;
+    }
+
+    removeFromQueue(type, patientId) {
+        const queue = type === 'testing' ? this.testingQueue : this.vaccinationQueue;
+        queue.heap = queue.heap.filter(item => item.item.id !== patientId);
+        this.updateStats();
     }
 }
 
-// Global queue manager instance
 const queueManager = new QueueManager();

@@ -158,7 +158,7 @@
                                     <input type="tel" id="patient-phone" required>
                                 </div>
 
-                                <div class="form-group" id="priority-group" style="display: none;">
+                                <!-- <div class="form-group" id="priority-group" style="display: none;">
                                     <label>Test Priority</label>
                                     <div class="radio-group">
                                         <label class="radio-option">
@@ -170,7 +170,25 @@
                                             <span>Urgent (Faster results - additional fee)</span>
                                         </label>
                                     </div>
-                                </div>
+                                </div> -->
+                                <!-- index.html - Add this section inside the patient-info div -->
+<div class="form-group" id="risk-level-group">
+    <label>Risk Level *</label>
+    <div class="radio-group">
+        <label class="radio-option">
+            <input type="radio" name="risk-level" value="high" required>
+            <span>High Risk (Elderly, immunocompromised)</span>
+        </label>
+        <label class="radio-option">
+            <input type="radio" name="risk-level" value="medium">
+            <span>Medium Risk (Underlying conditions)</span>
+        </label>
+        <label class="radio-option">
+            <input type="radio" name="risk-level" value="low">
+            <span>Low Risk (General population)</span>
+        </label>
+    </div>
+</div>
 
                                 <div class="step-actions">
                                     <button type="button" class="btn secondary" onclick="previousStep()">
