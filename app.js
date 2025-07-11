@@ -1,47 +1,90 @@
+// // Global Application State
+// let selectedService = 'covid-test';
+// let selectedDate = '';
+// let selectedTime = '';
+// let currentStep = 1;
+// let appointments = [];
+// let queueState = {
+//     testing: [],
+//     vaccination: [],
+//     currentlyServing: { testing: null, vaccination: null }
+// };
+
+// // Initialize the application
+// document.addEventListener('DOMContentLoaded', function() {
+//     // Clear any corrupted queue data
+//     if (localStorage.getItem('queueState')) {
+//         try {
+//             const savedState = JSON.parse(localStorage.getItem('queueState'));
+//             // Validate queue data structure
+//             if (savedState.testing && savedState.vaccination && savedState.currentlyServing) {
+//                 queueState = savedState;
+//             }
+//         } catch (e) {
+//             console.error("Clearing invalid queue data:", e);
+//             localStorage.removeItem('queueState');
+//         }
+//     }
+
+//     // Load appointments
+//     appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    
+//     initializeApp();
+//     startQueueUpdates();
+// });
+
+// function initializeApp() {
+//     generateDateOptions();
+    
+//     // Reset queue manager
+//     queueManager.testingQueue = new PriorityQueue();
+//     queueManager.vaccinationQueue = new PriorityQueue();
+//     queueManager.currentlyServing = { testing: null, vaccination: null };
+    
+//     // Rebuild queues from valid appointments only
+//     appointments.forEach(appointment => {
+//         if (!appointment.status || appointment.status !== 'cancelled') {
+//             const queueType = appointment.type.includes('Test') ? 'testing' : 'vaccination';
+//             queueManager.addToQueue(queueType, appointment);
+//         }
+//     });
+    
+//     saveQueueState();
+//     updateQueueDisplay();
+//     selectService('covid-test');
+// }
 // Global Application State
 let selectedService = 'covid-test';
 let selectedDate = '';
 let selectedTime = '';
 let currentStep = 1;
 let appointments = [];
-let queueState = {
-    testing: [],
-    vaccination: [],
-    currentlyServing: { testing: null, vaccination: null }
-};
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
-    // Clear any corrupted queue data
-    if (localStorage.getItem('queueState')) {
-        try {
-            const savedState = JSON.parse(localStorage.getItem('queueState'));
-            // Validate queue data structure
-            if (savedState.testing && savedState.vaccination && savedState.currentlyServing) {
-                queueState = savedState;
-            }
-        } catch (e) {
-            console.error("Clearing invalid queue data:", e);
-            localStorage.removeItem('queueState');
-        }
-    }
-
-    // Load appointments
-    appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-    
     initializeApp();
     startQueueUpdates();
 });
 
 function initializeApp() {
-    generateDateOptions();
+    // Clear any corrupted data
+    localStorage.removeItem('queueState');
     
-    // Reset queue manager
+    // Load appointments
+    appointments = JSON.parse(localStorage.getItem('appointments')) || [];
+    
+    // Initialize slot manager with existing appointments
+    appointments.forEach(appointment => {
+        if (appointment.status !== 'cancelled') {
+            slotManager.bookSlot(appointment.date, appointment.time, appointment);
+        }
+    });
+    
+    // Rebuild queues
     queueManager.testingQueue = new PriorityQueue();
     queueManager.vaccinationQueue = new PriorityQueue();
     queueManager.currentlyServing = { testing: null, vaccination: null };
     
-    // Rebuild queues from valid appointments only
     appointments.forEach(appointment => {
         if (!appointment.status || appointment.status !== 'cancelled') {
             const queueType = appointment.type.includes('Test') ? 'testing' : 'vaccination';
@@ -49,7 +92,7 @@ function initializeApp() {
         }
     });
     
-    saveQueueState();
+    generateDateOptions();
     updateQueueDisplay();
     selectService('covid-test');
 }
@@ -155,9 +198,22 @@ function selectDate(date) {
 // }
 function generateTimeOptions() {
     const timeGrid = document.getElementById('time-grid');
-    const availableSlots = slotManager.getAvailableSlots(selectedDate);
+    const now = new Date();
+    const isToday = selectedDate === now.toISOString().split('T')[0];
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    // Filter out past slots for today
+    const availableSlots = slotManager.getAvailableSlots(selectedDate)
+        .filter(slot => {
+            if (!isToday) return true;
+            const [hour, minute] = slot.time.split(':').map(Number);
+            return hour > currentHour || 
+                  (hour === currentHour && minute > currentMinute);
+        });
+
     timeGrid.innerHTML = '';
-    
+
     if (availableSlots.length === 0) {
         timeGrid.innerHTML = `
             <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #6b7280;">
@@ -167,25 +223,56 @@ function generateTimeOptions() {
         `;
         return;
     }
-    
+
     availableSlots.forEach(slot => {
+        const slotsLeft = slot.capacity - slot.booked;
         const timeOption = document.createElement('div');
-        timeOption.className = 'time-option';
-        timeOption.onclick = () => selectTime(slot.time);
-        timeOption.innerHTML = `
-            <div class="time">${slot.time}</div>
-            <div class="slots">${slot.capacity - slot.booked} left</div>
-        `;
+        timeOption.className = slotsLeft <= 0 ? 'time-option disabled' : 'time-option';
         
-        // Disable if no slots left
-        if (slot.capacity - slot.booked <= 0) {
-            timeOption.classList.add('disabled');
-            timeOption.onclick = null;
+        if (slotsLeft > 0) {
+            timeOption.onclick = () => selectTime(slot.time);
         }
         
+        timeOption.innerHTML = `
+            <div class="time">${slot.time}</div>
+            <div class="slots">${slotsLeft} left</div>
+        `;
         timeGrid.appendChild(timeOption);
     });
 }
+// function generateTimeOptions() {
+//     const timeGrid = document.getElementById('time-grid');
+//     const availableSlots = slotManager.getAvailableSlots(selectedDate);
+//     timeGrid.innerHTML = '';
+    
+//     if (availableSlots.length === 0) {
+//         timeGrid.innerHTML = `
+//             <div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: #6b7280;">
+//                 <i class="fas fa-clock" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+//                 <p>No available slots for this date</p>
+//             </div>
+//         `;
+//         return;
+//     }
+    
+//     availableSlots.forEach(slot => {
+//         const timeOption = document.createElement('div');
+//         timeOption.className = 'time-option';
+//         timeOption.onclick = () => selectTime(slot.time);
+//         timeOption.innerHTML = `
+//             <div class="time">${slot.time}</div>
+//             <div class="slots">${slot.capacity - slot.booked} left</div>
+//         `;
+        
+//         // Disable if no slots left
+//         if (slot.capacity - slot.booked <= 0) {
+//             timeOption.classList.add('disabled');
+//             timeOption.onclick = null;
+//         }
+        
+//         timeGrid.appendChild(timeOption);
+//     });
+// }
 
 function selectTime(time) {
     selectedTime = time;
@@ -256,6 +343,52 @@ function previousStep() {
 //     switchTabProgrammatically('dashboard');
 // });
 // In app.js - update the form submit handler
+// document.getElementById('patient-form').addEventListener('submit', function(e) {
+//     e.preventDefault();
+    
+//     const patientInfo = {
+//         id: Date.now(),
+//         name: document.getElementById('patient-name').value,
+//         email: document.getElementById('patient-email').value,
+//         phone: document.getElementById('patient-phone').value,
+//         age: document.getElementById('patient-age').value,
+//         riskLevel: document.querySelector('input[name="risk-level"]:checked').value,
+//         type: selectedService === 'covid-test' ? 'COVID-19 Test' : 'COVID-19 Vaccination',
+//         time: selectedTime,
+//         date: selectedDate,
+//         bookedAt: new Date().toISOString(),
+//         status: 'scheduled'
+//     };
+
+//     if (!patientInfo.name || !patientInfo.email || !patientInfo.phone || !patientInfo.riskLevel) {
+//         showToast('Missing Information', 'Please fill in all required fields.', 'error');
+//         return;
+//     }
+
+//     // First try to book the slot
+//     const bookingResult = slotManager.bookSlot(selectedDate, selectedTime, patientInfo);
+    
+//     if (bookingResult.success) {
+//         // Add to appointments
+//         appointments.push(patientInfo);
+//         localStorage.setItem('appointments', JSON.stringify(appointments));
+        
+//         // Add to queue
+//         const queueType = selectedService === 'covid-test' ? 'testing' : 'vaccination';
+//         queueManager.addToQueue(queueType, patientInfo);
+//         saveQueueState();
+
+//         showToast('Booked!', `Your ${patientInfo.type} is confirmed for ${patientInfo.time}`, 'success');
+//         resetBookingForm();
+//         updateQueueDisplay();
+//         switchTabProgrammatically('dashboard');
+//     } else if (bookingResult.waitlisted) {
+//         showToast('Waitlisted', `All slots are booked. You're #${bookingResult.position} on the waitlist.`, 'info');
+//     } else {
+//         showToast('Error', 'Could not book the selected time slot.', 'error');
+//     }
+// });
+// Updated Form Submission Handler
 document.getElementById('patient-form').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -273,12 +406,13 @@ document.getElementById('patient-form').addEventListener('submit', function(e) {
         status: 'scheduled'
     };
 
+    // Validate required fields
     if (!patientInfo.name || !patientInfo.email || !patientInfo.phone || !patientInfo.riskLevel) {
         showToast('Missing Information', 'Please fill in all required fields.', 'error');
         return;
     }
 
-    // First try to book the slot
+    // Try to book the slot
     const bookingResult = slotManager.bookSlot(selectedDate, selectedTime, patientInfo);
     
     if (bookingResult.success) {
@@ -292,8 +426,11 @@ document.getElementById('patient-form').addEventListener('submit', function(e) {
         saveQueueState();
 
         showToast('Booked!', `Your ${patientInfo.type} is confirmed for ${patientInfo.time}`, 'success');
+        
+        // Refresh the UI
+        generateTimeOptions(); // Update slot availability display
+        document.getElementById('continue-btn').style.display = 'none';
         resetBookingForm();
-        updateQueueDisplay();
         switchTabProgrammatically('dashboard');
     } else if (bookingResult.waitlisted) {
         showToast('Waitlisted', `All slots are booked. You're #${bookingResult.position} on the waitlist.`, 'info');
