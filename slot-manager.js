@@ -72,33 +72,28 @@ class TimeSlotManager {
         );
     }
 
+// In slot-manager.js
     bookSlot(date, time, patientData) {
         const daySlots = this.slots.get(date);
         if (!daySlots) return { success: false, waitlisted: false };
 
         const slot = daySlots.find(s => s.time === time);
-        if (!slot || slot.isPast) return { success: false, waitlisted: false };
-
-        // Check capacity
-        if (slot.booked >= slot.capacity) {
-            const priority = patientData.riskLevel === 'high' ? 1 : 
-                           patientData.riskLevel === 'medium' ? 2 : 3;
-            this.waitingQueue.enqueue({ date, time, ...patientData }, priority);
+        if (!slot || slot.isPast || slot.booked >= slot.capacity) {
             return { 
                 success: false, 
-                waitlisted: true, 
-                position: this.waitingQueue.size() 
+                waitlisted: true,
+                position: this.waitingQueue.size() + 1
             };
         }
 
-        // Book the slot
         slot.booked++;
         if (slot.booked >= slot.capacity) {
             slot.available = false;
         }
         this.saveSlotState();
-        return { success: true, waitlisted: false };
+        return { success: true };
     }
 }
+
 
 const slotManager = new TimeSlotManager();
