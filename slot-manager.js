@@ -74,6 +74,7 @@ class TimeSlotManager {
 
 // In slot-manager.js
     bookSlot(date, time, patientData) {
+            const slotKey = `${date}-${time}-${patientData.hospital}`;
         const daySlots = this.slots.get(date);
         if (!daySlots) return { success: false, waitlisted: false };
 

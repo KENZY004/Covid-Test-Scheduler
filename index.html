@@ -40,19 +40,11 @@
                     <h3>COVID-19 Testing</h3>
                     <p>Rapid antigen and PCR tests available. Results within 24 hours.</p>
                 </div>
-                <div class="card-content">
+                <div class="card-content" style="display:flex; justify-content: center;">
                     <div class="stat-row">
-                        <span>Available Slots Today:</span>
-                        <span class="stat-value green">24 slots</span>
+                        <h3>"Know Sooner, Act Faster – Get Tested Today!"</h3>
                     </div>
-                    <div class="stat-row">
-                        <span>Average Wait Time:</span>
-                        <span class="stat-value">15 minutes</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Next Available:</span>
-                        <span class="stat-value blue">2:30 PM</span>
-                    </div>
+                    
                 </div>
             </div>
 
@@ -64,19 +56,11 @@
                     <h3>COVID-19 Vaccination</h3>
                     <p>Primary doses, boosters, and updated vaccines available.</p>
                 </div>
-                <div class="card-content">
+                <div class="card-content" style="display:flex; justify-content: center; ">
                     <div class="stat-row">
-                        <span>Available Slots Today:</span>
-                        <span class="stat-value green">18 slots</span>
+                        <h3 >"Boost Your Defense – Vaccinate for a Healthier Tomorrow!"</h3>
                     </div>
-                    <div class="stat-row">
-                        <span>Average Wait Time:</span>
-                        <span class="stat-value">20 minutes</span>
-                    </div>
-                    <div class="stat-row">
-                        <span>Next Available:</span>
-                        <span class="stat-value green">3:15 PM</span>
-                    </div>
+                   
                 </div>
             </div>
         </div>
@@ -188,6 +172,30 @@
             <span>Low Risk (General population)</span>
         </label>
     </div>
+
+
+
+
+
+
+
+    <!-- Add this after the risk level group in patient-info section -->
+<div class="form-group" id="hospital-group">
+    <label for="hospital-select">Preferred Hospital *</label>
+    <select id="hospital-select" required>
+        <option value="">Select a hospital</option>
+        <option value="city-general">City General Hospital</option>
+        <option value="central-medical">Central Medical Center</option>
+        <option value="sunrise-hospital">Sunrise Community Hospital</option>
+        <option value="metro-health">Metro Health Clinic</option>
+    </select>
+</div>
+
+
+
+
+
+
 </div>
 
                                 <div class="step-actions">
@@ -233,17 +241,7 @@
                                 <i class="fas fa-heart-pulse"></i>
                             </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-content">
-                                <div class="stat-info">
-                                    <p>Last Updated</p>
-                                    <h3 id="last-updated">--:--</h3>
-                                </div>
-                                <button onclick="updateQueue()" class="refresh-btn">
-                                    <i class="fas fa-sync-alt"></i>
-                                </button>
-                            </div>
-                        </div>
+
                     </div>
 
                     <div class="queue-display">

@@ -1,58 +1,4 @@
-// // Global Application State
-// let selectedService = 'covid-test';
-// let selectedDate = '';
-// let selectedTime = '';
-// let currentStep = 1;
-// let appointments = [];
-// let queueState = {
-//     testing: [],
-//     vaccination: [],
-//     currentlyServing: { testing: null, vaccination: null }
-// };
 
-// // Initialize the application
-// document.addEventListener('DOMContentLoaded', function() {
-//     // Clear any corrupted queue data
-//     if (localStorage.getItem('queueState')) {
-//         try {
-//             const savedState = JSON.parse(localStorage.getItem('queueState'));
-//             // Validate queue data structure
-//             if (savedState.testing && savedState.vaccination && savedState.currentlyServing) {
-//                 queueState = savedState;
-//             }
-//         } catch (e) {
-//             console.error("Clearing invalid queue data:", e);
-//             localStorage.removeItem('queueState');
-//         }
-//     }
-
-//     // Load appointments
-//     appointments = JSON.parse(localStorage.getItem('appointments')) || [];
-    
-//     initializeApp();
-//     startQueueUpdates();
-// });
-
-// function initializeApp() {
-//     generateDateOptions();
-    
-//     // Reset queue manager
-//     queueManager.testingQueue = new PriorityQueue();
-//     queueManager.vaccinationQueue = new PriorityQueue();
-//     queueManager.currentlyServing = { testing: null, vaccination: null };
-    
-//     // Rebuild queues from valid appointments only
-//     appointments.forEach(appointment => {
-//         if (!appointment.status || appointment.status !== 'cancelled') {
-//             const queueType = appointment.type.includes('Test') ? 'testing' : 'vaccination';
-//             queueManager.addToQueue(queueType, appointment);
-//         }
-//     });
-    
-//     saveQueueState();
-//     updateQueueDisplay();
-//     selectService('covid-test');
-// }
 // Global Application State
 let selectedService = 'covid-test';
 let selectedDate = '';
@@ -64,6 +10,24 @@ let appointments = [];
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
     startQueueUpdates();
+    document.addEventListener('DOMContentLoaded', function() {
+    // ... other initialization code ...
+    
+    // Remove any existing onclick attributes from HTML
+    document.getElementById('covid-test-card').removeAttribute('onclick');
+    document.getElementById('vaccination-card').removeAttribute('onclick');
+    
+    // Add robust click handlers
+    document.getElementById('covid-test-card').addEventListener('click', function(e) {
+        e.preventDefault();
+        selectService('covid-test');
+    });
+    
+    document.getElementById('vaccination-card').addEventListener('click', function(e) {
+        e.preventDefault();
+        selectService('vaccination');
+    });
+});
 });
 
 function initializeApp() {
@@ -112,26 +76,55 @@ function initializeApp() {
 // Service Selection
 function selectService(service) {
     selectedService = service;
+    
+    // Update card selection UI
     document.querySelectorAll('.service-card').forEach(card => {
         card.classList.remove('selected');
     });
     document.getElementById(service + '-card').classList.add('selected');
+    
+    // Always switch to booking tab
+    switchTab('book');
+    
+    // Reset and show the booking interface
+    resetBookingForm();
+    generateDateOptions();
+    
+    // Ensure date selection is visible
+    document.getElementById('date-selection').classList.add('active');
+    document.getElementById('patient-info').classList.remove('active');
+    document.getElementById('time-selection').style.display = 'none';
+    
+    // Scroll to the date selection
+    setTimeout(() => {
+        document.getElementById('date-selection').scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'start'
+        });
+    }, 100);
 }
-
 // Tab Management
 function switchTab(tabName) {
+    // Update tab buttons
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.classList.remove('active');
     });
-    event.target.closest('.tab-button').classList.add('active');
+    document.querySelector(`.tab-button[onclick*="${tabName}"]`).classList.add('active');
     
+    // Update tab panels
     document.querySelectorAll('.tab-panel').forEach(panel => {
         panel.classList.remove('active');
     });
-    document.getElementById(tabName + '-tab').classList.add('active');
+    document.getElementById(`${tabName}-tab`).classList.add('active');
     
+    // Special handling for booking tab
+    if (tabName === 'book') {
+        resetBookingForm();
+    }
+    
+    // Refresh content if needed
     if (tabName === 'queue') renderQueue();
-    else if (tabName === 'dashboard') renderAppointments();
+    if (tabName === 'dashboard') renderAppointments();
 }
 
 // Date and Time Selection
@@ -324,19 +317,22 @@ function previousStep() {
 document.getElementById('patient-form').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const patientInfo = {
-        id: Date.now(),
-        name: document.getElementById('patient-name').value,
-        email: document.getElementById('patient-email').value,
-        phone: document.getElementById('patient-phone').value,
-        age: document.getElementById('patient-age').value,
-        riskLevel: document.querySelector('input[name="risk-level"]:checked').value,
-        type: selectedService === 'covid-test' ? 'COVID-19 Test' : 'COVID-19 Vaccination',
-        time: selectedTime,
-        date: selectedDate,
-        bookedAt: new Date().toISOString(),
-        status: 'scheduled'
-    };
+    // In the form submission handler, update patientInfo object:
+const patientInfo = {
+    id: Date.now(),
+    name: document.getElementById('patient-name').value,
+    email: document.getElementById('patient-email').value,
+    phone: document.getElementById('patient-phone').value,
+    age: document.getElementById('patient-age').value,
+    riskLevel: document.querySelector('input[name="risk-level"]:checked').value,
+    hospital: document.getElementById('hospital-select').value,
+    hospitalName: document.getElementById('hospital-select').options[document.getElementById('hospital-select').selectedIndex].text,
+    type: selectedService === 'covid-test' ? 'COVID-19 Test' : 'COVID-19 Vaccination',
+    time: selectedTime,
+    date: selectedDate,
+    bookedAt: new Date().toISOString(),
+    status: 'scheduled'
+};
 
     // Validate required fields
     if (!patientInfo.name || !patientInfo.email || !patientInfo.phone || !patientInfo.riskLevel) {
@@ -498,6 +494,13 @@ function renderQueue() {
     renderQueueSection('testing', 'testing-queue', 'testing-count');
     renderQueueSection('vaccination', 'vaccination-queue', 'vaccination-count');
 }
+
+
+
+
+
+
+
 function renderQueueSection(type, containerId, countId) {
     const now = new Date();
     const container = document.getElementById(containerId);
@@ -519,7 +522,7 @@ function renderQueueSection(type, containerId, countId) {
                 </div>
                 <div class="queue-item-info">
                     <h4>${currentPatient.name}</h4>
-                    <p>${currentPatient.type}</p>
+                    <p>${currentPatient.type} at ${currentPatient.hospitalName}</p>
                     <div class="risk-badge ${currentPatient.riskLevel}">
                         ${currentPatient.riskLevel} risk
                     </div>
@@ -556,7 +559,7 @@ function renderQueueSection(type, containerId, countId) {
                     </div>
                     <div class="queue-item-info">
                         <h4>${patient.name}</h4>
-                        <p>${patient.type}</p>
+                        <p>${patient.type} at ${patient.hospitalName}</p>
                         <div class="risk-badge ${patient.riskLevel}">
                             ${patient.riskLevel} risk
                         </div>
@@ -573,6 +576,15 @@ function renderQueueSection(type, containerId, countId) {
     }
 }
 
+
+
+
+
+
+
+
+
+
 function updateQueueStats() {
     const stats = queueManager.getStats();
     document.getElementById('total-served').textContent = stats.totalServed;
@@ -580,6 +592,15 @@ function updateQueueStats() {
     document.getElementById('current-wait').textContent = Math.round(stats.currentWaitTime) + ' min';
     document.getElementById('last-updated').textContent = stats.lastUpdated;
 }
+
+
+
+
+
+
+
+
+
 
 function renderAppointments() {
     const container = document.getElementById('appointments-list');
@@ -605,7 +626,7 @@ function renderAppointments() {
         appointmentDiv.setAttribute('data-id', appointment.id);
         appointmentDiv.innerHTML = `
             <div class="appointment-header">
-                <h3>${appointment.type}</h3>
+                <h3>${appointment.type} at ${appointment.hospitalName}</h3>
                 <div class="appointment-status ${appointment.status || 'scheduled'}">
                     ${appointment.status || 'scheduled'}
                 </div>
@@ -636,24 +657,74 @@ function renderAppointments() {
         container.appendChild(appointmentDiv);
     });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Update the cancelAppointment function to properly handle cancellation
 
 function cancelAppointment(appointmentId) {
-    // Find the appointment to get its type
-    const appointment = appointments.find(app => app.id === appointmentId);
-    if (!appointment) return;
+    if (!confirm("Are you sure you want to cancel this appointment?")) {
+        return;
+    }
 
-    // Remove from appointments
-    appointments = appointments.filter(app => app.id !== appointmentId);
+    // Find the appointment
+    const appointmentIndex = appointments.findIndex(app => app.id === appointmentId);
+    if (appointmentIndex === -1) return;
+
+    // Mark as cancelled
+    appointments[appointmentIndex].status = 'cancelled';
     localStorage.setItem('appointments', JSON.stringify(appointments));
     
-    // Remove from the correct queue
-    const queueType = appointment.type.includes('Test') ? 'testing' : 'vaccination';
+    // Remove from queue
+    const queueType = appointments[appointmentIndex].type.includes('Test') ? 'testing' : 'vaccination';
     queueManager.removeFromQueue(queueType, appointmentId);
     
-    saveQueueState();
-    updateQueueDisplay();
-    renderAppointments();
+    // Immediately update the UI
+    const appointmentElement = document.querySelector(`.appointment-card[data-id="${appointmentId}"]`);
+    if (appointmentElement) {
+        // Fade out animation
+        appointmentElement.style.opacity = '0';
+        setTimeout(() => {
+            appointmentElement.remove();
+            
+            // Show "no appointments" message if needed
+            if (document.querySelectorAll('.appointment-card').length === 0) {
+                const container = document.getElementById('appointments-list');
+                container.innerHTML = `
+                    <div class="no-appointments">
+                        <i class="fas fa-calendar-times"></i>
+                        <h3>No Active Appointments</h3>
+                        <p>You have no upcoming appointments</p>
+                    </div>
+                `;
+            }
+        }, 300);
+    }
+    
+    // Update queue display if on queue tab
+    if (document.getElementById('queue-tab').classList.contains('active')) {
+        renderQueue(); // This is your existing queue rendering function
+    }
     
     showToast('Cancelled', 'Appointment has been cancelled', 'info');
 }

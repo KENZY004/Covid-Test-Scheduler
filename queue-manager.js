@@ -1,19 +1,6 @@
 // queue-manager.js
 class QueueManager {
-    // constructor() {
-    //     this.testingQueue = new PriorityQueue();
-    //     this.vaccinationQueue = new PriorityQueue();
-    //     this.currentlyServing = {
-    //         testing: null,
-    //         vaccination: null
-    //     };
-    //     this.stats = {
-    //         totalServed: 0,
-    //         averageWaitTime: 15,
-    //         currentWaitTime: 12,
-    //         lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    //     };
-    // }
+   
      constructor() {
         this.testingQueue = new PriorityQueue();
         this.vaccinationQueue = new PriorityQueue();
