@@ -1,4 +1,10 @@
-/* Add to styles.css */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 select {
     width: 100%;
     padding: 0.75rem;
@@ -6,7 +12,7 @@ select {
     border-radius: 6px;
     font-size: 1rem;
     background-color: white;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+   
     background-repeat: no-repeat;
     background-position: right 0.75rem center;
     background-size: 16px 12px;
@@ -21,10 +27,6 @@ select:focus {
 }
 
 
-
-
-
-/* Add to styles.css */
 .service-card {
     cursor: pointer;
     user-select: none;
@@ -34,25 +36,16 @@ select:focus {
     scroll-behavior: smooth;
 }
 
-/* Visual feedback when clicking */
+
 .service-card:active {
     transform: scale(0.98);
     transition: transform 0.1s ease;
 }
 
-
-
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}/* Add to styles.css */
 .appointment-card {
     transition: opacity 0.3s ease;
 }
-/* Add to styles.css */
-/* Add to styles.css */
+
 .time-option.disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -871,7 +864,7 @@ body {
         display: none;
     }
 }
-/* Add to styles.css */
+
 .risk-badge {
     display: inline-block;
     padding: 0.25rem 0.5rem;
@@ -895,29 +888,7 @@ body {
     background: #10b981;
     color: white;
 }
-/*
-.risk-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    margin-top: 0.25rem;
-    color: white;
-}
 
-.risk-badge.high {
-    background: #dc2626; 
-}
-
-.risk-badge.medium {
-    background: #f59e0b; 
-}
-
-.risk-badge.low {
-    background: #10b981; 
-}*/
-/* Add these new styles to your existing CSS */
 .queue-item .priority {
     font-size: 0.75rem;
     color: #6b7280;
@@ -929,32 +900,6 @@ body {
     color: #1f2937;
 }
 
-/* Enhance existing risk badge styles */
-/*
-.risk-badge {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    text-transform: capitalize;
-}
-
-.risk-badge.high {
-    background: #dc2626;
-    color: white;
-}
-
-.risk-badge.medium {
-    background: #f59e0b;
-    color: white;
-}
-
-.risk-badge.low {
-    background: #10b981;
-    color: white;
-}*/
-/* Add to styles.css */
 .btn.danger {
     background: #dc2626;
     color: white;
@@ -974,16 +919,3 @@ body {
     bottom: 1rem;
     right: 1rem;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

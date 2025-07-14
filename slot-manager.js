@@ -72,7 +72,7 @@ class TimeSlotManager {
         );
     }
 
-// In slot-manager.js
+// bookslot
     bookSlot(date, time, patientData) {
             const slotKey = `${date}-${time}-${patientData.hospital}`;
         const daySlots = this.slots.get(date);
