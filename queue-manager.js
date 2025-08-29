@@ -1,7 +1,6 @@
-// queue-manager.js
+
 class QueueManager {
-   
-     constructor() {
+    constructor() {
         this.testingQueue = new PriorityQueue();
         this.vaccinationQueue = new PriorityQueue();
         this.currentlyServing = {
@@ -14,9 +13,6 @@ class QueueManager {
             currentWaitTime: 12,
             lastUpdated: new Date().toLocaleTimeString()
         };
-        
-        // Clear any existing queue data from localStorage
-        localStorage.removeItem('queueState');
     }
 
     getQueue(type) {
@@ -113,8 +109,27 @@ class QueueManager {
 
     removeFromQueue(type, patientId) {
         const queue = type === 'testing' ? this.testingQueue : this.vaccinationQueue;
-        queue.heap = queue.heap.filter(item => item.item.id !== patientId);
-        this.updateStats();
+        
+        // Find and remove the patient from the queue
+        const index = queue.heap.findIndex(item => item.item.id === patientId);
+        if (index !== -1) {
+            queue.heap.splice(index, 1);
+            // Rebuild the heap after removal
+            this.rebuildHeap(queue);
+            this.updateStats();
+            return true;
+        }
+        return false;
+    }
+
+    rebuildHeap(queue) {
+        // Simple method to rebuild the heap after removal
+        const items = [...queue.heap];
+        queue.heap = [];
+        items.forEach(item => {
+            queue.heap.push(item);
+            queue.heapifyUp();
+        });
     }
 }
 

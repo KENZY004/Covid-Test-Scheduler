@@ -1,38 +1,39 @@
+
 class TimeSlotManager {
     constructor() {
-        this.slots = new SlotHashMap();
-        this.waitingQueue = new PriorityQueue();
-        this.loadSlotState();
+        this.slots = {};
         this.initializeSlots();
     }
 
-    loadSlotState() {
-        const savedSlots = JSON.parse(localStorage.getItem('slotState'));
-        if (savedSlots) {
-            // Convert plain object back to SlotHashMap
-            const newMap = new SlotHashMap();
-            Object.keys(savedSlots).forEach(key => {
-                newMap[key] = savedSlots[key];
-            });
-            this.slots = newMap;
-        }
-    }
-
-    saveSlotState() {
-        localStorage.setItem('slotState', JSON.stringify(this.slots));
-    }
-
     initializeSlots() {
+        // Try to load from localStorage first
+        const savedSlots = localStorage.getItem('slotState');
+        
+        if (savedSlots) {
+            try {
+                this.slots = JSON.parse(savedSlots);
+                console.log("Slots restored from localStorage");
+                return;
+            } catch (e) {
+                console.error("Error restoring slots from localStorage:", e);
+                // If restoration fails, proceed to generate new slots
+            }
+        }
+        
+        // Generate new slots if none were saved or restoration failed
+        this.generateSlotsForNextTwoWeeks();
+        this.saveSlotState();
+    }
+
+    generateSlotsForNextTwoWeeks() {
         const today = new Date();
+        
         for (let day = 0; day < 14; day++) {
             const date = new Date(today);
             date.setDate(today.getDate() + day);
             const dateStr = date.toISOString().split('T')[0];
             
-            // Only initialize if not already loaded
-            if (!this.slots.get(dateStr)) {
-                this.slots.set(dateStr, this.generateDaySlots(dateStr));
-            }
+            this.slots[dateStr] = this.generateDaySlots(dateStr);
         }
     }
 
@@ -64,26 +65,33 @@ class TimeSlotManager {
     }
 
     getAvailableSlots(date) {
-        const daySlots = this.slots.get(date) || [];
-        return daySlots.filter(slot => 
+        if (!this.slots[date]) {
+            // If date doesn't exist in slots, generate slots for it
+            this.slots[date] = this.generateDaySlots(date);
+            this.saveSlotState();
+        }
+        
+        return this.slots[date].filter(slot => 
             slot.available && 
             slot.booked < slot.capacity && 
             !slot.isPast
         );
     }
 
-// bookslot
     bookSlot(date, time, patientData) {
-            const slotKey = `${date}-${time}-${patientData.hospital}`;
-        const daySlots = this.slots.get(date);
-        if (!daySlots) return { success: false, waitlisted: false };
-
+        // Ensure date exists in slots
+        if (!this.slots[date]) {
+            this.slots[date] = this.generateDaySlots(date);
+        }
+        
+        const daySlots = this.slots[date];
         const slot = daySlots.find(s => s.time === time);
+        
         if (!slot || slot.isPast || slot.booked >= slot.capacity) {
             return { 
                 success: false, 
                 waitlisted: true,
-                position: this.waitingQueue.size() + 1
+                position: 1 // Simple waitlist position
             };
         }
 
@@ -91,10 +99,33 @@ class TimeSlotManager {
         if (slot.booked >= slot.capacity) {
             slot.available = false;
         }
+        
         this.saveSlotState();
         return { success: true };
     }
-}
 
+    cancelSlot(date, time) {
+        if (!this.slots[date]) return false;
+
+        const daySlots = this.slots[date];
+        const slot = daySlots.find(s => s.time === time);
+        
+        if (!slot) return false;
+
+        slot.booked = Math.max(0, slot.booked - 1);
+        
+        // If slots become available again, mark as available
+        if (slot.booked < slot.capacity) {
+            slot.available = true;
+        }
+        
+        this.saveSlotState();
+        return true;
+    }
+
+    saveSlotState() {
+        localStorage.setItem('slotState', JSON.stringify(this.slots));
+    }
+}
 
 const slotManager = new TimeSlotManager();
